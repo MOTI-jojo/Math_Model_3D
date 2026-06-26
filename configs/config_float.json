@@ -1,0 +1,10 @@
+{
+  "serve_type": "float",
+  "spin_rpm": 0.0,
+  "S": 16.0,
+  "t_flight": 0.70,
+  "m": 0.27,
+  "dt_contact": 0.020,
+  "alpha_deg": 18.0,
+  "y0": 2.6
+}
