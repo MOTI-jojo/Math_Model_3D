@@ -23,7 +23,7 @@ def get_base64_of_bin_file(bin_file):
     return base64.b64encode(data).decode()
 
 # Set page config
-st.set_page_config(page_title=t["page_title"], page_icon="assets/BeeLogo.png", layout="wide")
+st.set_page_config(page_title=t["page_title"], page_icon="assets/BeeLogo.ico", layout="wide")
 
 # Custom CSS for Constructivism style with Auto Dark/Light theme support
 st.markdown("""
