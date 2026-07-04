@@ -17,7 +17,7 @@ def render_app():
     )
     from aerospike_cv.analysis.metrics import evaluate_serve
     from aerospike_cv.ui.i18n import TEXT
-    from aerospike_cv.core.config import BALL_MODELS, PRO_PRESETS
+    from aerospike_cv.core.config import BALL_MODELS
     
     # Select language via session state or default to Russian
     if "lang" not in st.session_state:
@@ -188,30 +188,7 @@ def render_app():
     with main_col:
         st.markdown(t["params"])
         
-        # ---- Пресеты профессионалов ---- #
-        st.markdown("### 🏆 Пресеты подач профессионалов")
-        preset_names = {k: f"{v.name}" for k, v in PRO_PRESETS.items()}
-        preset_choice = st.selectbox("Выбрать пресет", ["—"] + list(preset_names.values()), key="preset_select", label_visibility="collapsed")
-        
-        if preset_choice != "—":
-            for key, preset in PRO_PRESETS.items():
-                if preset.name == preset_choice:
-                    st.caption(f"_{preset.description}_")
-                    if st.button(f"⚡ Применить: {preset.name}", key=f"apply_{key}"):
-                        st.session_state.v0_num = preset.v0_kmh
-                        st.session_state.v0_slider = preset.v0_kmh
-                        st.session_state.alpha_num = preset.alpha_deg
-                        st.session_state.alpha_slider = preset.alpha_deg
-                        st.session_state.azimuth_num = preset.azimuth_deg
-                        st.session_state.azimuth_slider = preset.azimuth_deg
-                        st.session_state.y0_num = preset.y0
-                        st.session_state.y0_slider = preset.y0
-                        st.session_state.spin_num = preset.spin_rpm
-                        st.session_state.spin_slider = preset.spin_rpm
-                        st.session_state.spin_angle_num = preset.spin_angle_deg
-                        st.session_state.spin_angle_slider = preset.spin_angle_deg
-                        st.rerun()
-                    break
+
         
         st.markdown("---")
         
