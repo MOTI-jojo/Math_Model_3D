@@ -1,8 +1,9 @@
 TEXT = {
     "ru": {
-        "page_title": "МАТЕМАТИЧЕСКАЯ МОДЕЛЬ 3D",
-        "title": "МАТЕМАТИЧЕСКАЯ МОДЕЛЬ 3D",
-        "subtitle": "### СИМУЛЯЦИЯ ПОЛЁТА ВОЛЕЙБОЛЬНОГО МЯЧА. АЭРОДИНАМИКА.",
+        "page_title": "AeroSpike CV",
+        "title": "AeroSpike CV",
+        "lang_toggle": "🇺🇸 Switch to English",
+        "subtitle": "### СИМУЛЯТОР ПОЛЁТА ВОЛЕЙБОЛЬНОГО МЯЧА. АЭРОДИНАМИКА.",
         "params": "## ПАРАМЕТРЫ",
         "serve_type": "ТИП ПОДАЧИ",
         "serve_topspin": "TOPSPIN (СИЛОВАЯ)",
@@ -50,8 +51,9 @@ TEXT = {
         "an_drift_good": "НЕПРЕДСКАЗУЕМО: Отличное смещение планера в воздухе."
     },
     "en": {
-        "page_title": "MATH MODEL 3D",
-        "title": "MATH MODEL 3D",
+        "page_title": "AeroSpike CV",
+        "title": "AeroSpike CV",
+        "lang_toggle": "🇷🇺 Переключить на Русский",
         "subtitle": "### VOLLEYBALL FLIGHT SIMULATION. AERODYNAMICS.",
         "params": "## PARAMETERS",
         "serve_type": "SERVE TYPE",

@@ -5,14 +5,25 @@ Math Model 3D - Volleyball Flight Simulation
 """
 import streamlit as st
 import numpy as np
+import base64
 from src.input_handler import SimulationParams, ServeType
 from src.physics import solve_trajectory_3d, calculate_impact_force
 from src.visualization import plot_trajectory_3d, plot_speed_2d
 from src.analyzer import evaluate_serve
 from src.i18n import TEXT
 
+# Select language via session state or default to Russian
+if "lang" not in st.session_state:
+    st.session_state.lang = "ru"
+t = TEXT[st.session_state.lang]
+
+def get_base64_of_bin_file(bin_file):
+    with open(bin_file, 'rb') as f:
+        data = f.read()
+    return base64.b64encode(data).decode()
+
 # Set page config
-st.set_page_config(page_title="Math Model 3D", layout="wide")
+st.set_page_config(page_title=t["page_title"], layout="wide")
 
 # Custom CSS for Constructivism style with Auto Dark/Light theme support
 st.markdown("""
@@ -98,12 +109,40 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Language Selector
-lang_choice = st.radio("Language / Язык", ["RU", "EN"], horizontal=True)
-lang = lang_choice.lower()
-t = TEXT[lang]
+# CSS для кнопки языка и сброс отступов
+st.markdown("""
+<style>
+    /* Выравнивание кнопки языка вправо */
+    div[data-testid="column"]:nth-of-type(2) {
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+    }
+</style>
+""", unsafe_allow_html=True)
 
-st.title(t["title"])
+# Header Row
+header_col1, header_col2 = st.columns([6, 1])
+
+with header_col1:
+    try:
+        logo_base64 = get_base64_of_bin_file("assets/BeeLogo.svg")
+        st.markdown(f"""
+        <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 0.5rem; margin-top: -1rem;">
+            <img src="data:image/svg+xml;base64,{logo_base64}" width="65" height="65" style="object-fit: contain;" />
+            <h1 style="margin: 0; padding: 0; font-family: 'Oswald', sans-serif !important; font-size: 3.5rem; text-transform: uppercase;">{t['title']}</h1>
+        </div>
+        """, unsafe_allow_html=True)
+    except Exception:
+        st.title(t["title"])
+
+with header_col2:
+    def toggle_lang():
+        st.session_state.lang = "en" if st.session_state.lang == "ru" else "ru"
+    
+    current_lang_str = "RU" if st.session_state.lang == "ru" else "EN"
+    st.button(f"🌐 {current_lang_str}", on_click=toggle_lang, key="lang_btn")
+
 st.markdown(t["subtitle"])
 
 # ----------------- SESSION STATE SYNC ----------------- #
