@@ -8,8 +8,7 @@ import numpy as np
 import base64
 from src.input_handler import SimulationParams, ServeType
 from src.physics import solve_trajectory_3d, calculate_impact_force
-from src.visualization import plot_speed_2d
-from src.component import volleyball_3d
+from src.visualization import plot_trajectory_3d, plot_speed_2d
 from src.analyzer import evaluate_serve
 from src.i18n import TEXT
 from src.config import BALL_MODELS
@@ -293,8 +292,8 @@ try:
         m4.metric(t["force"], f"{impact_force:.1f} {t['unit_n']}")
         
         st.markdown("<br>", unsafe_allow_html=True)
-        # Using the new React-based 3D Component!
-        volleyball_3d(time_arr, x, y, z, idx_max_v)
+        fig = plot_trajectory_3d(x, y, z, speed_kmh, t, idx_max_v)
+        st.plotly_chart(fig, use_container_width=True, theme="streamlit")
         
         st.markdown("<br>", unsafe_allow_html=True)
         # Отрезаем данные после первого касания пола, чтобы график скорости не показывал резкий скачок отскока
