@@ -63,12 +63,16 @@ def solve_trajectory_3d(params: SimulationParams) -> Tuple[np.ndarray, np.ndarra
                 f_lateral = 0.5 * RHO * cl_actual * A_BALL * (v_mag**2) * dir_magnus
                 
         elif params.serve_type == ServeType.FLOAT:
-            # Karman vortex street (oscillating lateral and vertical forces)
-            # Shedding frequency: f = St * v / D
-            freq = STROUHAL_NUMBER * v_mag / D_BALL
-            # Two independent oscillating forces with random phase offsets
-            cl_z = 0.15 * math.sin(2 * math.pi * freq * t + phi_z)
-            cl_y = 0.08 * math.sin(2 * math.pi * freq * t + phi_y)
+            # Knuckleball effect (Macroscopic float effect due to seams)
+            # A pure Strouhal vortex shedding gives ~20+ Hz which cancels out in accurate RK45 integration.
+            # Real volleyball float shift is low-frequency (1-3 Hz) due to seam asymmetric boundary layer tripping.
+            # We scale the frequency down and increase amplitude to match realistic visible wobbles (like V3 aliasing did).
+            freq = (STROUHAL_NUMBER * v_mag / D_BALL) * 0.15 # ~2-3 Hz
+            
+            # Oscillating forces with random phases
+            cl_z = 0.25 * math.sin(2 * math.pi * freq * t + phi_z)
+            cl_y = 0.15 * math.sin(2 * math.pi * freq * t + phi_y)
+            
             f_z = 0.5 * RHO * cl_z * A_BALL * (v_mag**2)
             f_y = 0.5 * RHO * cl_y * A_BALL * (v_mag**2)
             f_lateral = np.array([0.0, f_y, f_z])

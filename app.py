@@ -210,6 +210,7 @@ with main_col:
         c2.number_input("spin_angle_n", -45.0, 45.0, key="spin_angle_num", on_change=sync_num, args=("spin_angle",), label_visibility="collapsed")
         current_spin_angle = st.session_state.spin_angle_num
     else:
+        st.info(t["float_tip"])
         current_spin = 0.0
         current_spin_angle = 0.0
         
