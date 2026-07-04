@@ -1,0 +1,110 @@
+import math
+import numpy as np
+from scipy.integrate import solve_ivp
+from typing import Tuple
+
+from .config import G, RHO, M_BALL, D_BALL, R_BALL, A_BALL, CL_DEFAULT, STROUHAL_NUMBER
+from .input_handler import SimulationParams, ServeType
+
+def solve_trajectory_3d(params: SimulationParams) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Solves the 3D trajectory of the volleyball using scipy.integrate.solve_ivp.
+    Returns (t, x, y, z, vx, vy, vz) arrays.
+    """
+    # Initial state
+    v0_x = params.v0 * math.cos(math.radians(params.alpha_deg))
+    v0_y = params.v0 * math.sin(math.radians(params.alpha_deg))
+    v0_z = 0.0
+    
+    # State vector: [x, y, z, vx, vy, vz]
+    initial_state = [0.0, params.y0, 0.0, v0_x, v0_y, v0_z]
+    
+    # Angular velocity (for topspin)
+    # Convert RPM to rad/s
+    omega_rad = params.spin_rpm * 2 * math.pi / 60.0
+    # Topspin implies rotation around Z axis. Right hand rule: forward is +X, up is +Y.
+    # Topspin means top of ball moves +X, so rotation is negative around Z.
+    omega_vec = np.array([0.0, 0.0, -omega_rad])
+    
+    def derivatives(t: float, state: np.ndarray) -> np.ndarray:
+        x, y, z, vx, vy, vz = state
+        v_vec = np.array([vx, vy, vz])
+        v_mag = np.linalg.norm(v_vec)
+        
+        if v_mag == 0:
+            return np.array([vx, vy, vz, 0.0, -G, 0.0])
+        
+        # Drag Force
+        # F_drag = -0.5 * rho * Cd * A * v_mag * v_vec
+        f_drag = -0.5 * RHO * params.cd * A_BALL * v_mag * v_vec
+        
+        # Lateral/Lift Force
+        f_lateral = np.array([0.0, 0.0, 0.0])
+        
+        if params.serve_type == ServeType.TOPSPIN and omega_rad > 0:
+            # Magnus Force
+            # F_magnus = 0.5 * rho * Cl * A * v_mag^2 * (omega x v) / (|omega| * |v|)
+            # Cl is roughly proportional to spin factor S = R * omega / v
+            S_factor = (R_BALL * omega_rad) / v_mag if v_mag > 0 else 0
+            cl_actual = CL_DEFAULT * S_factor # simplified relation
+            
+            omega_cross_v = np.cross(omega_vec, v_vec)
+            norm_cross = np.linalg.norm(omega_cross_v)
+            if norm_cross > 0:
+                dir_magnus = omega_cross_v / norm_cross
+                f_lateral = 0.5 * RHO * cl_actual * A_BALL * (v_mag**2) * dir_magnus
+                
+        elif params.serve_type == ServeType.FLOAT:
+            # Karman vortex street (oscillating side force)
+            # f = St * v / D
+            freq = STROUHAL_NUMBER * v_mag / D_BALL
+            # Simple oscillating force along Z axis
+            cl_float = 0.15 # Arbitrary coefficient for float side force
+            f_z = 0.5 * RHO * cl_float * A_BALL * (v_mag**2) * math.sin(2 * math.pi * freq * t)
+            f_lateral = np.array([0.0, 0.0, f_z])
+            
+        # Total Force
+        f_total = f_drag + f_lateral
+        f_total[1] -= M_BALL * G # Gravity
+        
+        # Accelerations
+        ax, ay, az = f_total / M_BALL
+        
+        return np.array([vx, vy, vz, ax, ay, az])
+        
+    # Event function to stop integration when ball hits the ground (y = 0)
+    def hit_ground(t, state):
+        return state[1] # y coordinate
+    hit_ground.terminal = True
+    hit_ground.direction = -1 # only trigger when going downwards
+    
+    # Time span (max 10 seconds flight)
+    t_span = (0.0, 10.0)
+    
+    sol = solve_ivp(
+        fun=derivatives,
+        t_span=t_span,
+        y0=initial_state,
+        method='RK45',
+        events=hit_ground,
+        dense_output=True,
+        max_step=0.01 # ensure we don't miss oscillations in float serve
+    )
+    
+    # Extract coordinates and velocities
+    t = sol.t
+    x = sol.y[0]
+    y = sol.y[1]
+    z = sol.y[2]
+    vx = sol.y[3]
+    vy = sol.y[4]
+    vz = sol.y[5]
+    
+    return t, x, y, z, vx, vy, vz
+
+def calculate_impact_force(v0: float, m: float = M_BALL, dt: float = 0.01) -> float:
+    """
+    Simplified estimate of impact force (F * dt = m * dv)
+    Assuming ball accelerates from 0 to v0 in dt seconds.
+    """
+    return (m * v0) / dt

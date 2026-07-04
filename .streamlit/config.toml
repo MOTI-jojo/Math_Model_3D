@@ -1,0 +1,5 @@
+[theme]
+base = "dark"
+primaryColor = "#E3000F"
+font = "sans serif"
+# backgroundColor and textColor omitted for auto light/dark theme detection

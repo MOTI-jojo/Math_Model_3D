@@ -1,0 +1,244 @@
+"""
+Math Model 3D - Volleyball Flight Simulation
+Главный файл приложения Streamlit. 
+Отвечает за отрисовку интерфейса, синхронизацию состояния и интеграцию с физическим движком.
+"""
+import streamlit as st
+import numpy as np
+from src.input_handler import SimulationParams, ServeType
+from src.physics import solve_trajectory_3d, calculate_impact_force
+from src.visualization import plot_trajectory_3d, plot_speed_2d
+from src.analyzer import evaluate_serve
+from src.i18n import TEXT
+
+# Set page config
+st.set_page_config(page_title="Math Model 3D", layout="wide")
+
+# Custom CSS for Constructivism style with Auto Dark/Light theme support
+st.markdown("""
+<style>
+    /* Global Styles */
+    @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&display=swap');
+    
+    html, body, [class*="css"] {
+        font-family: 'Oswald', sans-serif !important;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    /* Remove all border radius and add harsh borders */
+    .stButton>button, .stTextInput>div>div>input, .stNumberInput>div>div>input, .stSelectbox>div>div>div {
+        border-radius: 0px !important;
+        border: 2px solid var(--text-color) !important;
+        box-shadow: 4px 4px 0px var(--text-color) !important;
+        transition: all 0.1s;
+    }
+    
+    .stButton>button:active {
+        box-shadow: 0px 0px 0px var(--text-color) !important;
+        transform: translate(4px, 4px);
+    }
+    
+    /* Metrics */
+    [data-testid="stMetric"] {
+        background-color: var(--background-color);
+        border: 4px solid var(--text-color);
+        padding: 15px;
+        box-shadow: 6px 6px 0px #E3000F;
+    }
+    
+    [data-testid="stMetricLabel"] {
+        font-size: 14px;
+        font-weight: 700;
+        color: var(--text-color);
+    }
+    
+    [data-testid="stMetricValue"] {
+        font-size: 32px;
+        font-weight: 700;
+        color: #E3000F;
+    }
+    
+    /* Alerts for Analytics */
+    [data-testid="stAlert"] {
+        border-radius: 0px !important;
+        border: 4px solid var(--text-color) !important;
+        box-shadow: 6px 6px 0px #E3000F !important;
+        color: var(--text-color) !important;
+        background-color: var(--background-color) !important;
+    }
+    
+    /* Headers */
+    h1, h2, h3, h4, h5, h6 {
+        font-family: 'Oswald', sans-serif !important;
+        font-weight: 700 !important;
+        color: var(--text-color) !important;
+        text-transform: uppercase;
+    }
+    
+    h1 {
+        border-bottom: 8px solid #E3000F;
+        display: inline-block;
+        padding-bottom: 5px;
+        margin-bottom: 30px;
+    }
+    
+    /* Sidebar removal */
+    [data-testid="collapsedControl"] {
+        display: none;
+    }
+    
+    /* Hide ONLY the Deploy button, keep the settings menu */
+    .stDeployButton {display: none;}
+    footer {visibility: hidden;}
+
+    hr {
+        border-top: 4px solid var(--text-color);
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# Language Selector
+lang_choice = st.radio("Language / Язык", ["RU", "EN"], horizontal=True)
+lang = lang_choice.lower()
+t = TEXT[lang]
+
+st.title(t["title"])
+st.markdown(t["subtitle"])
+
+# ----------------- SESSION STATE SYNC ----------------- #
+def init_state(key, default):
+    if f"{key}_slider" not in st.session_state:
+        st.session_state[f"{key}_slider"] = default
+    if f"{key}_num" not in st.session_state:
+        st.session_state[f"{key}_num"] = default
+
+def sync_slider(key):
+    st.session_state[f"{key}_num"] = st.session_state[f"{key}_slider"]
+
+def sync_num(key):
+    st.session_state[f"{key}_slider"] = st.session_state[f"{key}_num"]
+
+# Init defaults
+init_state("v0", 90.0) # 90 km/h is a good default (25 m/s)
+init_state("alpha", 10.0)
+init_state("y0", 2.5)
+init_state("spin", 600.0)
+init_state("mass", 0.27)
+init_state("diameter", 0.21)
+init_state("cd", 0.40)
+# ------------------------------------------------------ #
+
+# Layout: 2 columns for Main (controls) and Visualization
+main_col, viz_col = st.columns([1, 2], gap="large")
+
+with main_col:
+    st.markdown(t["params"])
+    
+    serve_type_str = st.selectbox(t["serve_type"], [t["serve_topspin"], t["serve_float"]])
+    serve_type = ServeType.TOPSPIN if t["serve_topspin"] == serve_type_str else ServeType.FLOAT
+    
+    st.markdown("---")
+    
+    # Скорость
+    st.markdown(t["v0"])
+    c1, c2 = st.columns([3, 1])
+    c1.slider("v0_s", 30.0, 150.0, key="v0_slider", on_change=sync_slider, args=("v0",), label_visibility="collapsed")
+    c2.number_input("v0_n", 30.0, 150.0, key="v0_num", on_change=sync_num, args=("v0",), label_visibility="collapsed")
+    
+    # Угол
+    st.markdown(t["alpha"])
+    c1, c2 = st.columns([3, 1])
+    c1.slider("alpha_s", -15.0, 45.0, key="alpha_slider", on_change=sync_slider, args=("alpha",), label_visibility="collapsed")
+    c2.number_input("alpha_n", -15.0, 45.0, key="alpha_num", on_change=sync_num, args=("alpha",), label_visibility="collapsed")
+    
+    # Высота
+    st.markdown(t["y0"])
+    c1, c2 = st.columns([3, 1])
+    c1.slider("y0_s", 1.0, 4.0, key="y0_slider", on_change=sync_slider, args=("y0",), label_visibility="collapsed")
+    c2.number_input("y0_n", 1.0, 4.0, key="y0_num", on_change=sync_num, args=("y0",), label_visibility="collapsed")
+    
+    if serve_type == ServeType.TOPSPIN:
+        st.markdown(t["spin"])
+        c1, c2 = st.columns([3, 1])
+        c1.slider("spin_s", 0.0, 1000.0, key="spin_slider", on_change=sync_slider, args=("spin",), label_visibility="collapsed")
+        c2.number_input("spin_n", 0.0, 1000.0, key="spin_num", on_change=sync_num, args=("spin",), label_visibility="collapsed")
+        current_spin = st.session_state.spin_num
+    else:
+        current_spin = 0.0
+        
+    with st.expander(t["additional"]):
+        st.markdown(t["mass"])
+        c1, c2 = st.columns([3, 1])
+        c1.slider("mass_s", 0.20, 0.35, key="mass_slider", on_change=sync_slider, args=("mass",), label_visibility="collapsed")
+        c2.number_input("mass_n", 0.20, 0.35, key="mass_num", on_change=sync_num, args=("mass",), label_visibility="collapsed")
+        
+        st.markdown(t["cd"])
+        c1, c2 = st.columns([3, 1])
+        c1.slider("cd_s", 0.0, 1.0, key="cd_slider", on_change=sync_slider, args=("cd",), label_visibility="collapsed")
+        c2.number_input("cd_n", 0.0, 1.0, key="cd_num", on_change=sync_num, args=("cd",), label_visibility="collapsed")
+
+# Build params
+try:
+    params = SimulationParams(
+        mass=st.session_state.mass_num,
+        diameter=st.session_state.diameter_num, 
+        v0=st.session_state.v0_num / 3.6, # Convert km/h to m/s for physics engine
+        alpha_deg=st.session_state.alpha_num,
+        y0=st.session_state.y0_num,
+        serve_type=serve_type,
+        spin_rpm=current_spin,
+        cd=st.session_state.cd_num
+    )
+except Exception:
+    params = SimulationParams(
+        mass=st.session_state.mass_num,
+        v0=st.session_state.v0_num / 3.6,
+        alpha_deg=st.session_state.alpha_num,
+        y0=st.session_state.y0_num,
+        serve_type=serve_type,
+        spin_rpm=current_spin,
+        cd=st.session_state.cd_num
+    )
+
+try:
+    time_arr, x, y, z, vx, vy, vz = solve_trajectory_3d(params)
+    
+    # Calculate speed array and find index of max speed
+    speed_ms = (vx**2 + vy**2 + vz**2)**0.5
+    speed_kmh = speed_ms * 3.6
+    idx_max_v = int(np.argmax(speed_kmh))
+    
+    impact_force = calculate_impact_force(st.session_state.v0_num / 3.6, st.session_state.mass_num)
+    distance = x[-1]
+    flight_time = time_arr[-1]
+    max_height = max(y)
+    
+    with viz_col:
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric(t["dist"], f"{distance:.2f} {t['unit_m']}")
+        m2.metric(t["height"], f"{max_height:.2f} {t['unit_m']}")
+        m3.metric(t["time"], f"{flight_time:.2f} {t['unit_s']}")
+        m4.metric(t["force"], f"{impact_force:.1f} {t['unit_n']}")
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        fig = plot_trajectory_3d(x, y, z, speed_kmh, t, idx_max_v)
+        st.plotly_chart(fig, use_container_width=True, theme="streamlit")
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        fig_speed = plot_speed_2d(time_arr, speed_kmh, t)
+        st.plotly_chart(fig_speed, use_container_width=True, theme="streamlit")
+        
+        # Аналитика
+        st.markdown(f"### {t['an_title']}")
+        analysis_results = evaluate_serve(x, y, z, time_arr, speed_kmh, serve_type, t)
+        for res in analysis_results:
+            if res["status"] == "success":
+                st.success(f"**{res['param']}**: {res['comment']}")
+            elif res["status"] == "error":
+                st.error(f"**{res['param']}**: {res['comment']}")
+            else:
+                st.warning(f"**{res['param']}**: {res['comment']}")
+
+except Exception as e:
+    st.error(f"{t['error']} {e}")
